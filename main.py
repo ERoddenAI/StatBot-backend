@@ -59,5 +59,25 @@ def answer_question(question: str) -> str:
     top_indices = similarities.argsort()[-TOP_K:][::-1]
     context = "\n\n".join([rag_data[i]["chunk"] for i in top_indices])
     
-    # Build prompt
-    prompt = f"Use the following lecture notes to answer the question:\n\n{context}\n\nQuestion:
+    # Build prompt using triple quotes to avoid unterminated f-string
+    prompt = f"""Use the following lecture notes to answer the question:
+
+{context}
+
+Question: {question}
+Answer:"""
+    
+    # Generate answer
+    answer = gpt_model.generate(prompt)
+    return answer
+
+# === API ENDPOINT ===
+@app.post("/ask")
+def ask_question(req: QuestionRequest):
+    answer = answer_question(req.question)
+    return {"question": req.question, "answer": answer}
+
+# === OPTIONAL: HEALTHCHECK ===
+@app.get("/health")
+def health():
+    return {"status": "ok"}
