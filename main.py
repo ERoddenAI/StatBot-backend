@@ -17,7 +17,7 @@ RAG_FILE = "rag_data.json"
 # === INITIALIZE APP ===
 app = FastAPI(title="Stats Module Chatbot (Local RAG)")
 
-# === LOAD / CHUNK TEXT FILES ===
+# === LOAD / CHUNK TEXT FILES AND CREATE EMBEDDINGS IF NEEDED ===
 txt_files = [f for f in os.listdir(TXT_FOLDER) if f.endswith(".txt")]
 chunks = []
 
@@ -28,18 +28,16 @@ for txt_file in txt_files:
     file_chunks = [" ".join(words[i:i+CHUNK_SIZE]) for i in range(0, len(words), CHUNK_SIZE)]
     chunks.extend(file_chunks)
 
-# === GENERATE OR LOAD EMBEDDINGS ===
 embedder = SentenceTransformer(EMBEDDING_MODEL)
 
-if os.path.exists(RAG_FILE):
-    with open(RAG_FILE, "r", encoding="utf-8") as f:
-        rag_data = json.load(f)
-else:
+if not os.path.exists(RAG_FILE):
     embeddings = embedder.encode(chunks, show_progress_bar=True)
     rag_data = [{"chunk": chunk, "embedding": emb.tolist()} for chunk, emb in zip(chunks, embeddings)]
     with open(RAG_FILE, "w", encoding="utf-8") as f:
         json.dump(rag_data, f)
-print(f"{len(rag_data)} chunks ready for RAG.")
+    print(f"Saved {len(rag_data)} embeddings to {RAG_FILE}.")
+else:
+    print(f"{RAG_FILE} exists. Will lazy-load embeddings on request.")
 
 # === LOAD GPT4All ===
 gpt_model = GPT4All(model="ggml-gpt4all-j-v1")
@@ -48,25 +46,29 @@ gpt_model = GPT4All(model="ggml-gpt4all-j-v1")
 class QuestionRequest(BaseModel):
     question: str
 
-# === RAG + GPT ANSWER FUNCTION ===
+# === RAG + GPT ANSWER FUNCTION WITH LAZY LOADING ===
 def answer_question(question: str) -> str:
-    # Embed question
+    # Load embeddings from disk only when a question is asked
+    with open(RAG_FILE, "r", encoding="utf-8") as f:
+        rag_data = json.load(f)
+
+    # Embed the question
     q_emb = embedder.encode([question])
     all_emb = np.array([c["embedding"] for c in rag_data])
-    similarities = cosine_similarity(q_emb, all_emb)[0]
-    
+
     # Top-k chunks
+    similarities = cosine_similarity(q_emb, all_emb)[0]
     top_indices = similarities.argsort()[-TOP_K:][::-1]
     context = "\n\n".join([rag_data[i]["chunk"] for i in top_indices])
-    
-    # Build prompt using triple quotes to avoid unterminated f-string
+
+    # Build prompt with triple quotes to avoid unterminated f-string
     prompt = f"""Use the following lecture notes to answer the question:
 
 {context}
 
 Question: {question}
 Answer:"""
-    
+
     # Generate answer
     answer = gpt_model.generate(prompt)
     return answer
@@ -77,7 +79,7 @@ def ask_question(req: QuestionRequest):
     answer = answer_question(req.question)
     return {"question": req.question, "answer": answer}
 
-# === OPTIONAL: HEALTHCHECK ===
+# === HEALTHCHECK ENDPOINT ===
 @app.get("/health")
 def health():
     return {"status": "ok"}
