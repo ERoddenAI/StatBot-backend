@@ -1,0 +1,63 @@
+import os
+import json
+import numpy as np
+from fastapi import FastAPI
+from pydantic import BaseModel
+from sentence_transformers import SentenceTransformer
+from gpt4all import GPT4All
+from sklearn.metrics.pairwise import cosine_similarity
+
+# === SETTINGS ===
+TXT_FOLDER = "."  # folder with your .txt lecture files
+CHUNK_SIZE = 500  # words per chunk
+TOP_K = 3         # number of top chunks to use for context
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+RAG_FILE = "rag_data.json"
+
+# === INITIALIZE APP ===
+app = FastAPI(title="Stats Module Chatbot (Local RAG)")
+
+# === LOAD / CHUNK TEXT FILES ===
+txt_files = [f for f in os.listdir(TXT_FOLDER) if f.endswith(".txt")]
+chunks = []
+
+for txt_file in txt_files:
+    with open(txt_file, "r", encoding="utf-8") as f:
+        text = f.read()
+    words = text.split()
+    file_chunks = [" ".join(words[i:i+CHUNK_SIZE]) for i in range(0, len(words), CHUNK_SIZE)]
+    chunks.extend(file_chunks)
+
+# === GENERATE OR LOAD EMBEDDINGS ===
+embedder = SentenceTransformer(EMBEDDING_MODEL)
+
+if os.path.exists(RAG_FILE):
+    with open(RAG_FILE, "r", encoding="utf-8") as f:
+        rag_data = json.load(f)
+else:
+    embeddings = embedder.encode(chunks, show_progress_bar=True)
+    rag_data = [{"chunk": chunk, "embedding": emb.tolist()} for chunk, emb in zip(chunks, embeddings)]
+    with open(RAG_FILE, "w", encoding="utf-8") as f:
+        json.dump(rag_data, f)
+print(f"{len(rag_data)} chunks ready for RAG.")
+
+# === LOAD GPT4All ===
+gpt_model = GPT4All(model="ggml-gpt4all-j-v1")
+
+# === REQUEST SCHEMA ===
+class QuestionRequest(BaseModel):
+    question: str
+
+# === RAG + GPT ANSWER FUNCTION ===
+def answer_question(question: str) -> str:
+    # Embed question
+    q_emb = embedder.encode([question])
+    all_emb = np.array([c["embedding"] for c in rag_data])
+    similarities = cosine_similarity(q_emb, all_emb)[0]
+    
+    # Top-k chunks
+    top_indices = similarities.argsort()[-TOP_K:][::-1]
+    context = "\n\n".join([rag_data[i]["chunk"] for i in top_indices])
+    
+    # Build prompt
+    prompt = f"Use the following lecture notes to answer the question:\n\n{context}\n\nQuestion:
