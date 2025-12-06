@@ -43,8 +43,6 @@
 
       // Add user message to chat
       document.getElementById("chat").value += "You: " + userText + "\n";
-
-      // Clear input
       document.getElementById("input").value = "";
 
       try {
@@ -70,7 +68,7 @@
       }
     }
 
-    // Optional: send message on Enter key
+    // Send message on Enter key
     document.getElementById("input").addEventListener("keydown", function(e) {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -80,4 +78,3 @@
   </script>
 </body>
 </html>
-
