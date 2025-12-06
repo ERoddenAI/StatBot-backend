@@ -43,6 +43,8 @@
 
       // Add user message to chat
       document.getElementById("chat").value += "You: " + userText + "\n";
+
+      // Clear input
       document.getElementById("input").value = "";
 
       try {
@@ -53,6 +55,10 @@
         });
 
         const data = await response.json();
+
+        // Log full response for debugging
+        console.log("Netlify function response:", data);
+
         const botReply = data?.message || "(No response)";
 
         // Add bot reply to chat
@@ -68,7 +74,7 @@
       }
     }
 
-    // Send message on Enter key
+    // Optional: send message on Enter key
     document.getElementById("input").addEventListener("keydown", function(e) {
       if (e.key === "Enter") {
         e.preventDefault();
