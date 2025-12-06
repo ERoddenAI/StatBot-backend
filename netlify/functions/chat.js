@@ -1,7 +1,7 @@
 export async function handler(event, context) {
   try {
     const body = JSON.parse(event.body || "{}");
-    const userMessage = body.message;
+    const userMessage = body.message?.trim();
     if (!userMessage) {
       return { statusCode: 400, body: JSON.stringify({ message: "(No message provided)" }) };
     }
@@ -21,6 +21,12 @@ export async function handler(event, context) {
       })
     });
 
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Groq API error:", errText);
+      return { statusCode: 500, body: JSON.stringify({ message: "(Groq API error)" }) };
+    }
+
     const data = await response.json();
     const botReply = data?.choices?.[0]?.message?.content || "(No response)";
 
@@ -29,7 +35,7 @@ export async function handler(event, context) {
       body: JSON.stringify({ message: botReply })
     };
   } catch (err) {
-    console.error(err);
+    console.error("Function error:", err);
     return { statusCode: 500, body: JSON.stringify({ message: "(Error contacting API)" }) };
   }
 }
