@@ -12,6 +12,7 @@ export async function handler(event, context) {
       };
     }
 
+    // Call Groq API
     const response = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",
       {
@@ -32,14 +33,19 @@ export async function handler(event, context) {
 
     const data = await response.json();
 
+    // Extract the actual message text
+    const botReply = data?.choices?.[0]?.message?.content || "(No response)";
+
     return {
       statusCode: 200,
-      body: JSON.stringify(data)
+      headers: { "Access-Control-Allow-Origin": "*" }, // CORS for Netlify
+      body: JSON.stringify({ message: botReply })
     };
   } catch (err) {
     console.error("Error:", err);
     return {
       statusCode: 500,
+      headers: { "Access-Control-Allow-Origin": "*" },
       body: JSON.stringify({ error: "Server error." })
     };
   }
