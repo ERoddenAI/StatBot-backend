@@ -1,24 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Statistics Chatbot</title>
-  </head>
+<head>
+  <meta charset="UTF-8" />
+  <title>Statistics Chatbot</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 30px;
+    }
+    #chat {
+      width: 100%;
+      max-width: 700px;
+      height: 300px;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    #input {
+      width: 70%;
+      padding: 10px;
+      margin-right: 5px;
+    }
+    button {
+      padding: 10px 15px;
+    }
+  </style>
+</head>
+<body>
+  <h2>StatBot</h2>
 
-  <body>
-    <h2>Statistics Chatbot</h2>
+  <textarea id="chat" readonly></textarea><br>
 
-    <textarea id="chat" rows="15" cols="60" readonly></textarea><br><br>
+  <input id="input" type="text" placeholder="Ask something..." />
+  <button onclick="sendMessage()">Send</button>
 
-    <input id="input" type="text" placeholder="Ask something..." size="50" />
-    <button onclick="sendMessage()">Send</button>
+  <script>
+    async function sendMessage() {
+      const userText = document.getElementById("input").value.trim();
+      if (!userText) return;
 
-    <script>
-      async function sendMessage() {
-        const userText = document.getElementById("input").value;
+      // Add user message to chat
+      document.getElementById("chat").value += "You: " + userText + "\n";
 
-        document.getElementById("chat").value += "You: " + userText + "\n";
+      // Clear input
+      document.getElementById("input").value = "";
 
+      try {
         const response = await fetch("/.netlify/functions/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -26,13 +55,28 @@
         });
 
         const data = await response.json();
-        const botReply =
-          data?.choices?.[0]?.message?.content || "(No response)";
+        const botReply = data?.message || "(No response)";
 
+        // Add bot reply to chat
         document.getElementById("chat").value += "Bot: " + botReply + "\n\n";
-        document.getElementById("input").value = "";
-      }
-    </script>
-  </body>
-</html>
 
+        // Scroll to bottom
+        const chatArea = document.getElementById("chat");
+        chatArea.scrollTop = chatArea.scrollHeight;
+
+      } catch (err) {
+        console.error("Error:", err);
+        document.getElementById("chat").value += "Bot: (Error contacting server)\n\n";
+      }
+    }
+
+    // Optional: send message on Enter key
+    document.getElementById("input").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+  </script>
+</body>
+</html>
