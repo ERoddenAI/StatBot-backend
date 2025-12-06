@@ -19,7 +19,7 @@
 
         document.getElementById("chat").value += "You: " + userText + "\n";
 
-        const response = await fetch("/.netlify/functions/chat", {
+        const response = await fetch("/chat.js", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: userText })
